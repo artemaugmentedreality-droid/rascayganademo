@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Master AR - Rasca y Gana</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; color: white; }
+        #pantalla-inicio { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #selector-tarjetas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .contenedor-imagenes { display: flex; gap: 15px; margin-top: 25px; }
+        .tarjeta-opcion { width: 90px; border: 2px solid #fff; border-radius: 12px; cursor: pointer; transition: transform 0.2s; }
+        #contenedor-juego { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; z-index: 1000; text-align: center; }
+        canvas { border: 5px solid white; border-radius: 20px; background: #fff; touch-action: none; }
+        .boton { background: #FFD700; color: #000; border: none; padding: 18px 45px; border-radius: 35px; font-weight: bold; font-size: 18px; margin-top: 20px; cursor: pointer; }
+        #btn-reclamar { background: #2ecc71; color: white; display: none; margin: 25px auto; }
+        #modal-registro { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2500; justify-content: center; align-items: center; }
+        .caja-registro { background: #fff; padding: 30px; border-radius: 25px; width: 85%; max-width: 320px; text-align: center; color: #333; }
+        .caja-registro input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <div id="pantalla-inicio">
+        <h1>¡RASCA Y GANA AR!</h1>
+        <button class="boton" onclick="activarCamara()">COMENZAR</button>
+    </div>
+
+    <div id="selector-tarjetas">
+        <h2>¡QR DETECTADO!<br>Elige una tarjeta:</h2>
+        <div class="contenedor-imagenes">
+            <img src="assets/tapa1.webp" class="tarjeta-opcion" onclick="elegir(1)">
+            <img src="assets/tapa2.webp" class="tarjeta-opcion" onclick="elegir(2)">
+            <img src="assets/tapa3.webp" class="tarjeta-opcion" onclick="elegir(3)">
+        </div>
+    </div>
+
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: no;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" loading-screen="enabled: false">
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        <a-entity id="marcador" mindar-image-target="targetIndex: 0"></a-entity>
+    </a-scene>
+
+    <div id="contenedor-juego">
+        <canvas id="lienzo-rascar" width="300" height="400"></canvas>
+        <button id="btn-reclamar" class="boton" onclick="abrirRegistro()">RECLAMAR PREMIO</button>
+    </div>
+
+    <div id="modal-registro">
+        <div class="caja-registro">
+            <h2>¡Felicidades!</h2>
+            <p id="texto-premio" style="color:#d35400; font-weight:bold;"></p>
+            <input type="text" id="nombre" placeholder="Nombre completo">
+            <input type="tel" id="telefono" placeholder="WhatsApp">
+            <button class="boton" style="background:#2ecc71; color:#fff; width:100%;" onclick="finalizar()">CANJEAR POR WHATSAPP</button>
+        </div>
+    </div>
+
+    <script>
+        const listaPremios = {
+            1: "10% de descuento en etiqueta roja",
+            2: "50% de descuento en etiqueta amarilla",
+            3: "30% de descuento en toda la tienda"
+        };
+        
+        let idPremioAzar = 0;
+        const lienzo = document.getElementById('lienzo-rascar');
+        const contexto = lienzo.getContext('2d');
+
+        function activarCamara() {
+            document.getElementById('pantalla-inicio').style.display = 'none';
+            document.querySelector('a-scene').systems["mindar-image-system"].start();
+        }
+
+        document.getElementById('marcador').addEventListener("targetFound", () => {
+            if(idPremioAzar === 0) document.getElementById('selector-tarjetas').style.display = 'flex';
+            else document.getElementById('contenedor-juego').style.display = 'block';
+        });
+
+        function elegir(idCajaVisual) {
+            idPremioAzar = Math.floor(Math.random() * 3) + 1; // Aleatoriedad real
+            document.getElementById('selector-tarjetas').style.display = 'none';
+            document.getElementById('contenedor-juego').style.display = 'block';
+            
+            const imgTapa = new Image();
+            imgTapa.src = `assets/tapa${idCajaVisual}.webp`;
+            imgTapa.onload = () => contexto.drawImage(imgTapa, 0, 0, 300, 400);
+            
+            lienzo.style.backgroundImage = `url('assets/premio${idPremioAzar}.webp')`;
+            lienzo.style.backgroundSize = "100% 100%";
+        }
+
+        lienzo.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const rect = lienzo.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            contexto.globalCompositeOperation = 'destination-out';
+            contexto.beginPath(); contexto.arc(x, y, 30, 0, Math.PI*2); contexto.fill();
+            if(contexto.getImageData(150, 200, 1, 1).data[3] === 0) document.getElementById('btn-reclamar').style.display = 'block';
+        });
+
+        function abrirRegistro() {
+            document.getElementById('texto-premio').innerText = "GANASTE: " + listaPremios[idPremioAzar];
+            document.getElementById('modal-registro').style.display = 'flex';
+        }
+
+        function finalizar() {
+            const nom = document.getElementById('nombre').value;
+            const tel = document.getElementById('telefono').value;
+            if(!nom || !tel) return alert("Completa tus datos");
+
+            const mensaje = `¡Hola! Soy ${nom}. Gané: ${listaPremios[idPremioAzar]}. Mi número: ${tel}`;
+            window.location.href = `https://wa.me/215542492026?text=${encodeURIComponent(mensaje)}`;
+        }
+    </script>
+</body>
+</html>
